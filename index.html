@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>天南海北</title>
     <link rel="stylesheet" href="./vendor/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=17" />
+    <link rel="stylesheet" href="./styles.css?v=18" />
   </head>
   <body>
     <div class="app-shell">
@@ -117,7 +117,22 @@
         </div>
         <div class="traveler-list" id="travelerList"></div>
       </section>
+
+      <section class="feature-page" id="featurePage" hidden>
+        <div class="feature-page-content">
+          <i data-lucide="construction"></i>
+          <h2>新功能开发中</h2>
+          <p>下一段旅程正在整理，敬请期待。</p>
+        </div>
+      </section>
     </div>
+
+    <button class="page-nav page-nav-left" id="pagePrevBtn" type="button" title="上一页" hidden>
+      <i data-lucide="chevron-left"></i>
+    </button>
+    <button class="page-nav page-nav-right" id="pageNextBtn" type="button" title="下一页">
+      <i data-lucide="chevron-right"></i>
+    </button>
 
     <input id="photoInput" type="file" accept="image/*" multiple hidden />
     <input id="importInput" type="file" accept="application/json,.json" hidden />
@@ -133,6 +148,6 @@
     <script src="./vendor/lucide.min.js"></script>
     <script src="./vendor/supabase.js"></script>
     <script src="./supabase-config.js?v=2"></script>
-    <script src="./app.js?v=18"></script>
+    <script src="./app.js?v=19"></script>
   </body>
 </html>

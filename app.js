@@ -79,6 +79,8 @@ const KEY_LABEL_NAMES = new Set([
 ]);
 
 const els = {
+  topbar: document.querySelector(".topbar"),
+  workspace: document.querySelector(".workspace"),
   visitedCount: document.querySelector("#visitedCount"),
   photoCount: document.querySelector("#photoCount"),
   progressPercent: document.querySelector("#progressPercent"),
@@ -101,6 +103,9 @@ const els = {
   travelerList: document.querySelector("#travelerList"),
   travelerCount: document.querySelector("#travelerCount"),
   viewModeText: document.querySelector("#viewModeText"),
+  featurePage: document.querySelector("#featurePage"),
+  pagePrevBtn: document.querySelector("#pagePrevBtn"),
+  pageNextBtn: document.querySelector("#pageNextBtn"),
   lightbox: document.querySelector("#lightbox"),
   lightboxImage: document.querySelector("#lightboxImage"),
   lightboxCaption: document.querySelector("#lightboxCaption"),
@@ -115,6 +120,7 @@ let regions = [];
 let selectedId = null;
 let listFilter = "all";
 let activeOwnerId = "all";
+let currentPage = 0;
 
 const state = loadState();
 const cloud = {
@@ -163,6 +169,7 @@ async function init() {
   drawRegions(geojson);
   await initCloud();
   renderAll();
+  setPage(0);
 
   setTimeout(() => map.invalidateSize(), 120);
 }
@@ -283,6 +290,8 @@ function bindGlobalEvents() {
   els.exportBtn.addEventListener("click", exportData);
   els.importBtn.addEventListener("click", () => els.importInput.click());
   els.clearAllBtn.addEventListener("click", clearAllMyRecords);
+  els.pagePrevBtn.addEventListener("click", () => setPage(0));
+  els.pageNextBtn.addEventListener("click", () => setPage(1));
   els.importInput.addEventListener("change", importData);
   els.photoInput.addEventListener("change", handlePhotoUpload);
   els.lightboxClose.addEventListener("click", closeLightbox);
@@ -292,6 +301,24 @@ function bindGlobalEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !els.lightbox.hidden) closeLightbox();
   });
+}
+
+function setPage(page) {
+  currentPage = page;
+  const isFeaturePage = currentPage === 1;
+
+  els.topbar.hidden = isFeaturePage;
+  els.workspace.hidden = isFeaturePage;
+  els.travelersSection.hidden = isFeaturePage;
+  els.featurePage.hidden = !isFeaturePage;
+  els.pagePrevBtn.hidden = !isFeaturePage;
+  els.pageNextBtn.hidden = isFeaturePage;
+
+  if (!isFeaturePage && map) {
+    setTimeout(() => map.invalidateSize(), 120);
+  }
+
+  refreshIcons();
 }
 
 function populateProvinceFilter() {
