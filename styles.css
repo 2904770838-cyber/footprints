@@ -34,6 +34,10 @@ body {
   overflow: auto;
 }
 
+body.feature-mode {
+  overflow: hidden;
+}
+
 button,
 input,
 select,
@@ -889,7 +893,10 @@ button {
 }
 
 .feature-page {
-  min-height: calc(100vh - 36px);
+  position: fixed;
+  inset: 18px;
+  z-index: 1500;
+  min-height: auto;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -1121,7 +1128,7 @@ button {
   }
 
   .feature-page {
-    min-height: calc(100vh - 20px);
+    inset: 10px;
   }
 
   .feature-page-content {

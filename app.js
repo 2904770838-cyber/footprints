@@ -307,12 +307,14 @@ function setPage(page) {
   currentPage = page;
   const isFeaturePage = currentPage === 1;
 
+  document.body.classList.toggle("feature-mode", isFeaturePage);
   els.topbar.hidden = isFeaturePage;
   els.workspace.hidden = isFeaturePage;
   els.travelersSection.hidden = isFeaturePage;
   els.featurePage.hidden = !isFeaturePage;
   els.pagePrevBtn.hidden = !isFeaturePage;
   els.pageNextBtn.hidden = isFeaturePage;
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 
   if (!isFeaturePage && map) {
     setTimeout(() => map.invalidateSize(), 120);
