@@ -180,7 +180,6 @@ async function init() {
 
   populateProvinceFilter();
   drawRegions(geojson);
-  initGlobe(geojson);
   await initCloud();
   renderAll();
   setPage(0);
@@ -698,7 +697,6 @@ function bindGlobalEvents() {
 
   els.fitChinaBtn.addEventListener("click", () => {
     if (chinaBounds) map.fitBounds(chinaBounds, { padding: [22, 22] });
-    focusGlobeOnChina();
   });
 
   els.toggleLabelsBtn.addEventListener("click", cycleLabelMode);
@@ -1152,7 +1150,6 @@ function focusProvince(province) {
     const merged = bounds.reduce((acc, item) => acc.extend(item), bounds[0]);
     map.fitBounds(merged, { padding: [55, 55], maxZoom: 7 });
   }
-  focusGlobeOnProvince(province);
   renderAll();
 }
 
@@ -1166,7 +1163,6 @@ function selectRegion(id, zoomTo) {
       }
     });
   }
-  if (zoomTo) focusGlobeOnRegion(id);
   renderAll();
 }
 
@@ -1320,7 +1316,6 @@ function refreshMapStyles() {
     layer.setStyle(styleForFeature(layer.feature));
     if (layer.feature.properties.id === selectedId) layer.bringToFront();
   });
-  refreshGlobeStyles();
 }
 
 function refreshPhotoMarkers() {
