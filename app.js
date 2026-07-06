@@ -1,4 +1,6 @@
 const DATA_URL = "./data/china-regions.geojson?v=3";
+const EARTH_TEXTURE_URL = "./assets/earth-atmos-2048.jpg?v=1";
+const EARTH_TEXTURE_FALLBACK_URL = "https://raw.githubusercontent.com/mrdoob/three.js/r149/examples/textures/planets/earth_atmos_2048.jpg";
 const STORE_KEY = "china-travel-footprints-v1";
 const NAME_KEY = "china-travel-footprints-name";
 const MAX_IMAGE_EDGE = 1280;
@@ -270,8 +272,8 @@ function initGlobe(geojson) {
   mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 900);
-  camera.position.set(0, 0, 310);
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 1000);
+  camera.position.set(0, 0, 430);
 
   const root = new THREE.Group();
   const outlineGroup = new THREE.Group();
@@ -279,31 +281,51 @@ function initGlobe(geojson) {
   root.add(outlineGroup, markerGroup);
   scene.add(root);
 
-  scene.add(new THREE.AmbientLight(0x8fe9ff, 1.45));
+  scene.add(new THREE.AmbientLight(0x8fe9ff, 0.92));
   const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
   keyLight.position.set(-120, 90, 220);
   scene.add(keyLight);
+  const rimLight = new THREE.DirectionalLight(0x42f5ff, 1.1);
+  rimLight.position.set(160, -60, -140);
+  scene.add(rimLight);
+
+  const textureLoader = new THREE.TextureLoader();
+  textureLoader.setCrossOrigin?.("anonymous");
+  const earthTexture = textureLoader.load(
+    EARTH_TEXTURE_URL,
+    () => globe?.renderer.render(globe.scene, globe.camera),
+    undefined,
+    () => {
+      textureLoader.load(EARTH_TEXTURE_FALLBACK_URL, (fallbackTexture) => {
+        earth.material.map = fallbackTexture;
+        earth.material.needsUpdate = true;
+      });
+    },
+  );
+  if (THREE.SRGBColorSpace) earthTexture.colorSpace = THREE.SRGBColorSpace;
+  if (THREE.sRGBEncoding) earthTexture.encoding = THREE.sRGBEncoding;
 
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(100, 96, 48),
+    new THREE.SphereGeometry(84, 128, 64),
     new THREE.MeshPhongMaterial({
-      color: 0x143a46,
-      emissive: 0x061b24,
-      shininess: 24,
+      map: earthTexture,
+      color: 0xffffff,
+      emissive: 0x06111a,
+      shininess: 18,
       transparent: true,
-      opacity: 0.96,
+      opacity: 1,
     }),
   );
   root.add(earth);
 
   const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(103.5, 96, 48),
-    new THREE.MeshBasicMaterial({ color: 0x2df4ff, transparent: true, opacity: 0.1, side: THREE.BackSide }),
+    new THREE.SphereGeometry(87.5, 96, 48),
+    new THREE.MeshBasicMaterial({ color: 0x2df4ff, transparent: true, opacity: 0.13, side: THREE.BackSide }),
   );
   root.add(glow);
 
   const atmosphere = new THREE.Mesh(
-    new THREE.SphereGeometry(118, 96, 48),
+    new THREE.SphereGeometry(99, 96, 48),
     new THREE.MeshBasicMaterial({ color: 0x17d9ff, transparent: true, opacity: 0.055, side: THREE.BackSide }),
   );
   scene.add(atmosphere);
@@ -366,7 +388,7 @@ function addGlobeRegion(feature) {
   rings.forEach((ring) => {
     const sampled = sampleRing(ring, 160);
     if (sampled.length < 2) return;
-    const points = sampled.map(([lon, lat]) => lonLatToVector(lon, lat, 101.2));
+    const points = sampled.map(([lon, lat]) => lonLatToVector(lon, lat, 85.35));
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const material = new THREE.LineBasicMaterial({ color: 0x70f7ff, transparent: true, opacity: 0.28 });
     const line = new THREE.Line(geometry, material);
@@ -379,7 +401,7 @@ function addGlobeRegion(feature) {
     new THREE.SphereGeometry(1.75, 12, 8),
     new THREE.MeshBasicMaterial({ color: 0x76fff1, transparent: true, opacity: 0.84 }),
   );
-  marker.position.copy(lonLatToVector(center.lon, center.lat, 103.4));
+  marker.position.copy(lonLatToVector(center.lon, center.lat, 87.2));
   marker.userData.regionId = id;
   group.add(marker);
 
@@ -426,7 +448,7 @@ function bindGlobeEvents() {
 
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
-    globe.camera.position.z = Math.max(210, Math.min(380, globe.camera.position.z + Math.sign(event.deltaY) * 16));
+    globe.camera.position.z = Math.max(330, Math.min(560, globe.camera.position.z + Math.sign(event.deltaY) * 18));
   }, { passive: false });
 
   window.addEventListener("resize", fitGlobeToElement);
