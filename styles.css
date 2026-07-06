@@ -1138,6 +1138,30 @@ button {
     url("./assets/china-travel-hero.jpg") center / cover;
 }
 
+/* User names are intentionally black for readability by request. */
+.current-user-chip,
+.current-user-chip span,
+.traveler-card strong,
+.community-row strong,
+.gallery-tile span,
+.photo-open + span {
+  color: #050505 !important;
+}
+
+.current-user-chip,
+.traveler-card strong,
+.community-row strong {
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: 7px;
+}
+
+.traveler-card strong,
+.community-row strong {
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 6px;
+}
+
 .lightbox-open {
   overflow: hidden;
 }
