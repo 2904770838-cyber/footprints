@@ -731,6 +731,25 @@ function bindGlobalEvents() {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !els.lightbox.hidden) closeLightbox();
   });
+
+  bindTravelerRail();
+}
+
+function bindTravelerRail() {
+  if (!els.travelerList || els.travelerList.dataset.wheelBound === "true") return;
+
+  els.travelerList.dataset.wheelBound = "true";
+  els.travelerList.addEventListener(
+    "wheel",
+    (event) => {
+      if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+      if (els.travelerList.scrollWidth <= els.travelerList.clientWidth + 4) return;
+
+      event.preventDefault();
+      els.travelerList.scrollLeft += event.deltaY;
+    },
+    { passive: false },
+  );
 }
 
 function setPage(page) {
@@ -832,6 +851,12 @@ function renderTravelers() {
       renderAll();
       document.querySelector(".workspace").scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  });
+
+  els.travelerList.querySelector(".traveler-card.active")?.scrollIntoView({
+    behavior: "smooth",
+    block: "nearest",
+    inline: "center",
   });
 }
 
