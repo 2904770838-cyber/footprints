@@ -8,17 +8,17 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&family=Noto+Serif+SC:wght@500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
     />
     <link rel="stylesheet" href="./vendor/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=28" />
+    <link rel="stylesheet" href="./styles.css?v=29" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
           <span class="brand-mark"><i data-lucide="map"></i></span>
-          <div>
+          <div class="brand-copy">
             <p>China Travel Footprints</p>
             <div class="brand-title-row">
               <h1>天南海北</h1>
@@ -29,6 +29,11 @@
               <button class="name-edit-btn" id="editNameBtn" type="button" title="修改名称">
                 <i data-lucide="pencil"></i>
               </button>
+            </div>
+            <div class="brand-subline" aria-hidden="true">
+              <span>flat atlas</span>
+              <span>live memories</span>
+              <span>shared footprints</span>
             </div>
           </div>
         </div>
@@ -87,6 +92,10 @@
               <i data-lucide="tag"></i>
               重点名称
             </button>
+          </div>
+          <div class="map-stage-note" aria-hidden="true">
+            <span>ATLAS MODE</span>
+            <p>Search, filter, and illuminate each stop without losing the flat-map clarity.</p>
           </div>
           <div class="legend">
             <span><b class="swatch lit"></b>已点亮</span>
