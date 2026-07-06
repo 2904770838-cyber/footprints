@@ -161,6 +161,62 @@ button {
   letter-spacing: 0;
 }
 
+.brand-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.current-user-chip {
+  min-height: 30px;
+  max-width: 220px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(6, 127, 122, 0.22);
+  border-radius: 8px;
+  color: var(--teal-dark);
+  background: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.current-user-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.current-user-chip svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.name-edit-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(216, 95, 71, 0.26);
+  border-radius: 8px;
+  color: #fff8e8;
+  background: linear-gradient(135deg, var(--teal), var(--coral));
+}
+
+.name-edit-btn:hover {
+  transform: translateY(-1px);
+}
+
+.name-edit-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .top-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(78px, 1fr));
@@ -835,6 +891,55 @@ button {
   background: rgba(6, 42, 40, 0.88);
 }
 
+.name-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 3100;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(11, 24, 22, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.name-dialog[hidden] {
+  display: none;
+}
+
+.name-dialog-panel {
+  width: min(420px, 100%);
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 8px;
+  background:
+    linear-gradient(150deg, rgba(255, 252, 244, 0.98), rgba(244, 222, 192, 0.92)),
+    url("./assets/china-travel-hero.jpg") center / cover;
+  box-shadow: var(--shadow);
+}
+
+.name-dialog-panel label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.name-dialog-panel input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.name-dialog-panel .primary-btn {
+  width: 100%;
+  margin-top: 14px;
+}
+
 .lightbox-open {
   overflow: hidden;
 }
@@ -1138,6 +1243,14 @@ button {
 
   .topbar {
     gap: 10px;
+  }
+
+  .brand-title-row {
+    gap: 6px;
+  }
+
+  .current-user-chip {
+    max-width: min(210px, calc(100vw - 118px));
   }
 
   .top-stats {

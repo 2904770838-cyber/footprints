@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>天南海北</title>
     <link rel="stylesheet" href="./vendor/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=19" />
+    <link rel="stylesheet" href="./styles.css?v=20" />
   </head>
   <body>
     <div class="app-shell">
@@ -14,7 +14,16 @@
           <span class="brand-mark"><i data-lucide="map"></i></span>
           <div>
             <p>China Travel Footprints</p>
-            <h1>天南海北</h1>
+            <div class="brand-title-row">
+              <h1>天南海北</h1>
+              <span class="current-user-chip" title="当前用户">
+                <i data-lucide="user-round"></i>
+                <span id="currentUserName">旅人</span>
+              </span>
+              <button class="name-edit-btn" id="editNameBtn" type="button" title="修改名称">
+                <i data-lucide="pencil"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -144,10 +153,29 @@
       <p id="lightboxCaption"></p>
     </div>
 
+    <div class="name-dialog" id="nameDialog" hidden>
+      <div class="name-dialog-panel">
+        <div class="section-title">
+          <h2>修改名称</h2>
+          <button class="icon-btn" id="nameDialogCancel" type="button" title="关闭">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <label>
+          当前用户名称
+          <input id="nameDialogInput" type="text" maxlength="28" autocomplete="nickname" />
+        </label>
+        <button class="primary-btn" id="nameDialogSave" type="button">
+          <i data-lucide="save"></i>
+          保存名称
+        </button>
+      </div>
+    </div>
+
     <script src="./vendor/leaflet.js"></script>
     <script src="./vendor/lucide.min.js"></script>
     <script src="./vendor/supabase.js"></script>
     <script src="./supabase-config.js?v=2"></script>
-    <script src="./app.js?v=20"></script>
+    <script src="./app.js?v=21"></script>
   </body>
 </html>

@@ -99,6 +99,12 @@ const els = {
   exportBtn: document.querySelector("#exportBtn"),
   importBtn: document.querySelector("#importBtn"),
   clearAllBtn: document.querySelector("#clearAllBtn"),
+  currentUserName: document.querySelector("#currentUserName"),
+  editNameBtn: document.querySelector("#editNameBtn"),
+  nameDialog: document.querySelector("#nameDialog"),
+  nameDialogInput: document.querySelector("#nameDialogInput"),
+  nameDialogSave: document.querySelector("#nameDialogSave"),
+  nameDialogCancel: document.querySelector("#nameDialogCancel"),
   travelersSection: document.querySelector("#travelersSection"),
   travelerList: document.querySelector("#travelerList"),
   travelerCount: document.querySelector("#travelerCount"),
@@ -119,7 +125,7 @@ let chinaBounds;
 let regions = [];
 let selectedId = null;
 let listFilter = "all";
-let activeOwnerId = "all";
+let activeOwnerId = "local";
 let currentPage = 0;
 
 const state = loadState();
@@ -212,6 +218,7 @@ async function initCloud() {
 
     cloud.user = user;
     ensureTravelerName();
+    activeOwnerId = cloud.user.id;
     cloud.enabled = true;
     cloud.ready = true;
     await loadCloudData();
@@ -290,6 +297,16 @@ function bindGlobalEvents() {
   els.exportBtn.addEventListener("click", exportData);
   els.importBtn.addEventListener("click", () => els.importInput.click());
   els.clearAllBtn.addEventListener("click", clearAllMyRecords);
+  els.editNameBtn.addEventListener("click", openNameDialog);
+  els.nameDialogSave.addEventListener("click", saveNameDialog);
+  els.nameDialogCancel.addEventListener("click", closeNameDialog);
+  els.nameDialog.addEventListener("click", (event) => {
+    if (event.target === els.nameDialog) closeNameDialog();
+  });
+  els.nameDialogInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") saveNameDialog();
+    if (event.key === "Escape") closeNameDialog();
+  });
   els.pagePrevBtn.addEventListener("click", () => setPage(0));
   els.pageNextBtn.addEventListener("click", () => setPage(1));
   els.importInput.addEventListener("change", importData);
@@ -332,6 +349,7 @@ function populateProvinceFilter() {
 }
 
 function renderAll() {
+  renderCurrentUserName();
   renderTravelers();
   renderStats();
   renderSelectedPlace();
@@ -341,6 +359,10 @@ function renderAll() {
   refreshPhotoMarkers();
   applyLabelVisibility();
   refreshIcons();
+}
+
+function renderCurrentUserName() {
+  els.currentUserName.textContent = getTravelerName();
 }
 
 function renderStats() {
@@ -477,11 +499,6 @@ function renderSelectedPlace() {
     </div>
 
     <div class="fields">
-      ${cloud.enabled ? `
-        <label>
-          我的昵称
-          <input id="travelerNameInput" type="text" maxlength="28" value="${escapeHtml(getTravelerName())}" />
-        </label>` : ""}
       <label>
         到达日期
         <input id="dateInput" type="date" value="${escapeHtml(record.date || "")}" />
@@ -504,7 +521,6 @@ function renderSelectedPlace() {
   document.querySelector("#clearPlaceBtn").addEventListener("click", clearSelectedPlace);
   document.querySelector("#dateInput").addEventListener("change", updateSelectedDate);
   document.querySelector("#noteInput").addEventListener("change", updateSelectedNote);
-  document.querySelector("#travelerNameInput")?.addEventListener("change", updateTravelerName);
   document.querySelectorAll(".delete-photo").forEach((button) => {
     button.addEventListener("click", () => deletePhoto(button.dataset.photoId));
   });
@@ -842,7 +858,7 @@ async function loadCloudData() {
     createdAt: new Date(photo.created_at).getTime(),
   }));
   if (activeOwnerId !== "all" && !getTravelers().some((traveler) => traveler.owner_id === activeOwnerId)) {
-    activeOwnerId = "all";
+    activeOwnerId = cloud.user?.id || "local";
   }
   renderAll();
 }
@@ -903,8 +919,49 @@ async function clearMyCloudPlace(regionId) {
 
 async function updateTravelerName(event) {
   const name = event.target.value.trim() || ensureTravelerName();
+  await setTravelerName(name);
+}
+
+async function promptTravelerName() {
+  const current = getTravelerName();
+  const next = window.prompt("请输入你的名称", current);
+  if (next === null) return;
+  const name = next.trim();
+  if (!name) return alert("名称不能为空");
+  await setTravelerName(name.slice(0, 28));
+}
+
+function openNameDialog() {
+  els.nameDialogInput.value = getTravelerName();
+  els.nameDialog.hidden = false;
+  els.nameDialogInput.focus();
+  els.nameDialogInput.select();
+  refreshIcons();
+}
+
+function closeNameDialog() {
+  els.nameDialog.hidden = true;
+}
+
+async function saveNameDialog() {
+  const name = els.nameDialogInput.value.trim();
+  if (!name) return alert("名称不能为空");
+  els.nameDialogSave.disabled = true;
+  try {
+    await setTravelerName(name.slice(0, 28));
+    closeNameDialog();
+  } finally {
+    els.nameDialogSave.disabled = false;
+  }
+}
+
+async function setTravelerName(name) {
   localStorage.setItem(NAME_KEY, name);
-  if (!cloud.enabled) return;
+  renderCurrentUserName();
+  if (!cloud.enabled) {
+    renderAll();
+    return;
+  }
   await cloud.client.from("footprints").update({ owner_name: name }).eq("owner_id", cloud.user.id);
   await cloud.client.from("photos").update({ owner_name: name }).eq("owner_id", cloud.user.id);
   await loadCloudData();
