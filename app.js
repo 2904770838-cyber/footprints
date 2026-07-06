@@ -82,6 +82,19 @@ const KEY_LABEL_NAMES = new Set([
   "新竹市",
   "基隆市",
 ]);
+const OVERVIEW_LABEL_NAMES = new Set([
+  "北京市",
+  "上海市",
+  "广州市",
+  "成都市",
+  "西安市",
+  "昆明市",
+  "拉萨市",
+  "乌鲁木齐市",
+  "香港",
+  "澳门",
+  "台北市",
+]);
 
 const els = {
   topbar: document.querySelector(".topbar"),
@@ -122,9 +135,12 @@ const els = {
   lightboxImage: document.querySelector("#lightboxImage"),
   lightboxCaption: document.querySelector("#lightboxCaption"),
   lightboxClose: document.querySelector("#lightboxClose"),
+  mistCanvas: document.querySelector("#mistCanvas"),
+  mapShell: document.querySelector(".map-shell"),
 };
 
 let map;
+let mapVectorRenderer;
 let regionLayer;
 let photoMarkerLayer;
 let chinaBounds;
@@ -134,6 +150,7 @@ let listFilter = "all";
 let activeOwnerId = "local";
 let currentPage = 0;
 let globe = null;
+let sceneMotionBound = false;
 
 const state = loadState();
 const cloud = {
@@ -183,14 +200,17 @@ async function init() {
   await initCloud();
   renderAll();
   setPage(0);
+  initCinematicScene();
 
   setTimeout(() => map.invalidateSize(), 120);
 }
 
 function initMap() {
+  mapVectorRenderer = L.canvas({ padding: 0.5 });
   map = L.map("map", {
     zoomControl: false,
-    preferCanvas: false,
+    preferCanvas: true,
+    renderer: mapVectorRenderer,
     minZoom: 3,
     maxZoom: 11,
     worldCopyJump: false,
@@ -205,6 +225,12 @@ function initMap() {
   }).addTo(map);
 
   photoMarkerLayer = L.layerGroup().addTo(map);
+  map.on("movestart zoomstart", () => document.body.classList.add("map-moving"));
+  map.on("moveend zoomend", () => document.body.classList.remove("map-moving"));
+  map.on("zoomend", () => {
+    if (!regionLayer || state.labelMode !== "key") return;
+    regionLayer.eachLayer((layer) => bindCityLabel(layer));
+  });
 }
 
 async function initCloud() {
@@ -240,6 +266,7 @@ async function initCloud() {
 
 function drawRegions(geojson) {
   regionLayer = L.geoJSON(geojson, {
+    renderer: mapVectorRenderer,
     style: styleForFeature,
     onEachFeature(feature, layer) {
       const { id } = feature.properties;
@@ -657,11 +684,17 @@ function styleForFeature(feature) {
   const fillColor = getRegionFillColor(id, summary);
 
   return {
-    color: isSelected || (searchActive && isSearchMatch) ? "#063f3d" : summary.any ? shadeColor(fillColor, -24) : "rgba(23, 76, 72, 0.62)",
-    weight: isSelected ? 2.8 : searchActive && isSearchMatch ? 2.1 : summary.mine ? 1.35 : summary.any ? 1.1 : 0.72,
-    opacity: searchActive && !isSearchMatch ? 0.24 : isSelected ? 1 : 0.9,
-    fillColor: summary.any ? fillColor : "#fff6df",
-    fillOpacity: searchActive && !isSearchMatch ? 0.06 : isSelected || (searchActive && isSearchMatch) ? 0.78 : summary.photos ? 0.68 : summary.mine ? 0.58 : summary.any ? 0.44 : 0.2,
+    color: isSelected
+      ? "#f4c99a"
+      : searchActive && isSearchMatch
+        ? "#b79cff"
+        : summary.any
+          ? shadeColor(fillColor, -18)
+          : "rgba(113, 100, 160, 0.52)",
+    weight: isSelected ? 2.6 : searchActive && isSearchMatch ? 2.05 : summary.mine ? 1.42 : summary.any ? 1.12 : 0.76,
+    opacity: searchActive && !isSearchMatch ? 0.18 : isSelected ? 1 : 0.9,
+    fillColor: summary.any ? fillColor : "#171b25",
+    fillOpacity: searchActive && !isSearchMatch ? 0.04 : isSelected || (searchActive && isSearchMatch) ? 0.74 : summary.photos ? 0.58 : summary.mine ? 0.52 : summary.any ? 0.42 : 0.16,
     dashArray: summary.any ? "" : "3 4",
   };
 }
@@ -750,6 +783,204 @@ function bindTravelerRail() {
     },
     { passive: false },
   );
+}
+
+function initCinematicScene() {
+  if (sceneMotionBound) return;
+  sceneMotionBound = true;
+
+  const sceneProfile = getScenePerformanceProfile();
+  document.body.classList.toggle("performance-lite", sceneProfile.lite);
+  document.body.classList.toggle("performance-rich", !sceneProfile.lite);
+
+  bindSceneParallax(sceneProfile);
+  if (sceneProfile.mist) {
+    startMistParticles(sceneProfile);
+  } else if (els.mistCanvas) {
+    els.mistCanvas.hidden = true;
+  }
+
+  window.requestAnimationFrame(() => {
+    document.body.classList.add("scene-ready");
+  });
+}
+
+function getScenePerformanceProfile() {
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+  const finePointer = window.matchMedia?.("(pointer: fine)")?.matches ?? true;
+  const wideLayout = window.innerWidth >= 1400;
+  const cpuCores = navigator.hardwareConcurrency || 0;
+  const memory = navigator.deviceMemory || 0;
+  const highEndDesktop = !reducedMotion && finePointer && wideLayout && cpuCores >= 12 && memory >= 8;
+
+  return {
+    lite: !highEndDesktop,
+    mist: highEndDesktop,
+    particleCount: highEndDesktop ? 16 : 0,
+    pointerParallax: highEndDesktop,
+    dprCap: highEndDesktop ? 1.35 : 1,
+  };
+}
+
+function bindSceneParallax(sceneProfile) {
+  const root = document.documentElement;
+  let scrollFrame = 0;
+  let pointerFrame = 0;
+  let latestPointerX = 0;
+  let latestPointerY = 0;
+
+  const syncScroll = () => {
+    scrollFrame = 0;
+    root.style.setProperty("--scroll-y", `${Math.min(window.scrollY || 0, 1800).toFixed(1)}px`);
+  };
+
+  const scheduleScrollSync = () => {
+    if (scrollFrame) return;
+    scrollFrame = window.requestAnimationFrame(syncScroll);
+  };
+
+  const applyPointer = () => {
+    pointerFrame = 0;
+    root.style.setProperty("--pointer-x", latestPointerX.toFixed(4));
+    root.style.setProperty("--pointer-y", latestPointerY.toFixed(4));
+  };
+
+  const syncPointer = (event) => {
+    const width = Math.max(window.innerWidth, 1);
+    const height = Math.max(window.innerHeight, 1);
+    latestPointerX = ((event.clientX || width / 2) / width - 0.5) * 2;
+    latestPointerY = ((event.clientY || height / 2) / height - 0.5) * 2;
+    if (pointerFrame) return;
+    pointerFrame = window.requestAnimationFrame(applyPointer);
+  };
+
+  scheduleScrollSync();
+  root.style.setProperty("--pointer-x", "0");
+  root.style.setProperty("--pointer-y", "0");
+
+  window.addEventListener("scroll", scheduleScrollSync, { passive: true });
+  window.addEventListener("resize", scheduleScrollSync, { passive: true });
+  if (sceneProfile.pointerParallax) {
+    window.addEventListener("pointermove", syncPointer, { passive: true });
+    window.addEventListener(
+      "pointerout",
+      (event) => {
+        if (event.relatedTarget) return;
+        latestPointerX = 0;
+        latestPointerY = 0;
+        if (pointerFrame) return;
+        pointerFrame = window.requestAnimationFrame(applyPointer);
+      },
+      { passive: true },
+    );
+  }
+}
+
+function startMistParticles(sceneProfile) {
+  const canvas = els.mistCanvas;
+  if (!canvas || canvas.dataset.ready === "true") return;
+
+  const context = canvas.getContext("2d");
+  if (!context) return;
+  canvas.dataset.ready = "true";
+
+  let cssWidth = 0;
+  let cssHeight = 0;
+  let dpr = 1;
+  let frame = 0;
+  let particles = [];
+  let animationFrame = 0;
+
+  const createParticle = (warmBand = false) => ({
+    x: Math.random() * cssWidth,
+    y: cssHeight * (warmBand ? 0.56 + Math.random() * 0.24 : 0.22 + Math.random() * 0.54),
+    radius: 120 + Math.random() * 260,
+    speedX: (warmBand ? 0.08 : 0.05) + Math.random() * 0.16,
+    speedY: -0.02 + Math.random() * 0.06,
+    alpha: 0.03 + Math.random() * 0.06,
+    warmBand,
+    drift: Math.random() * Math.PI * 2,
+  });
+
+  const reseedParticles = () => {
+    particles = Array.from({ length: sceneProfile.particleCount }, (_, index) => createParticle(index % 3 === 0));
+  };
+
+  const resizeCanvas = () => {
+    dpr = Math.min(window.devicePixelRatio || 1, sceneProfile.dprCap);
+    cssWidth = Math.max(window.innerWidth, 1);
+    cssHeight = Math.max(window.innerHeight, 1);
+    canvas.width = Math.round(cssWidth * dpr);
+    canvas.height = Math.round(cssHeight * dpr);
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    reseedParticles();
+  };
+
+  const drawParticle = (particle) => {
+    const pulse = 0.88 + Math.sin(frame * 0.012 + particle.drift) * 0.12;
+    const radius = particle.radius * pulse;
+    const gradient = context.createRadialGradient(particle.x, particle.y, 0, particle.x, particle.y, radius);
+
+    if (particle.warmBand) {
+      gradient.addColorStop(0, `rgba(255, 188, 132, ${particle.alpha * 1.3})`);
+      gradient.addColorStop(0.42, `rgba(255, 147, 102, ${particle.alpha * 0.68})`);
+      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    } else {
+      gradient.addColorStop(0, `rgba(194, 178, 255, ${particle.alpha})`);
+      gradient.addColorStop(0.42, `rgba(125, 146, 255, ${particle.alpha * 0.55})`);
+      gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    }
+
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(particle.x, particle.y, radius, 0, Math.PI * 2);
+    context.fill();
+  };
+
+  const animate = () => {
+    if (document.hidden) {
+      animationFrame = window.requestAnimationFrame(animate);
+      return;
+    }
+    frame += 1;
+    context.clearRect(0, 0, cssWidth, cssHeight);
+    context.globalCompositeOperation = "screen";
+
+    particles.forEach((particle) => {
+      particle.x += particle.speedX;
+      particle.y += particle.speedY + Math.sin(frame * 0.008 + particle.drift) * 0.08;
+
+      if (particle.x - particle.radius > cssWidth + 80) {
+        Object.assign(particle, createParticle(particle.warmBand));
+        particle.x = -particle.radius;
+      }
+
+      if (particle.y + particle.radius < -80) {
+        particle.y = cssHeight + particle.radius;
+      }
+
+      drawParticle(particle);
+    });
+
+    context.globalCompositeOperation = "source-over";
+    animationFrame = window.requestAnimationFrame(animate);
+  };
+
+  resizeCanvas();
+  window.addEventListener("resize", resizeCanvas, { passive: true });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && animationFrame) {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+      return;
+    }
+    if (!document.hidden && !animationFrame) {
+      animationFrame = window.requestAnimationFrame(animate);
+    }
+  });
+  animationFrame = window.requestAnimationFrame(animate);
 }
 
 function setPage(page) {
@@ -974,6 +1205,11 @@ function renderList() {
     return;
   }
 
+  if (els.provinceFilter.value) {
+    renderProvinceResults(els.provinceFilter.value);
+    return;
+  }
+
   const provinces = getProvinceProgress();
   els.listTitle.textContent = "省份进度";
   els.resultCount.textContent = provinces.length;
@@ -1021,6 +1257,49 @@ function renderSearchResults() {
 
   els.placeList.innerHTML = matches
     .slice(0, 80)
+    .map((region) => {
+      const summary = getRegionSummary(region.id);
+      return `
+        <button class="place-row ${selectedId === region.id ? "selected" : ""}" data-id="${escapeHtml(region.id)}">
+          <span>
+            <strong>${escapeHtml(region.name)}</strong>
+            <small>${escapeHtml(region.province)} · ${escapeHtml(region.kind)}</small>
+          </span>
+          <span class="row-badges">
+            ${summary.mine ? `<b class="mine">我</b>` : ""}
+            ${summary.any ? `<b>已点亮</b>` : ""}
+            ${summary.photos ? `<b>${summary.photos} 图</b>` : ""}
+          </span>
+        </button>`;
+    })
+    .join("");
+
+  els.placeList.querySelectorAll(".place-row").forEach((button) => {
+    button.addEventListener("click", () => selectRegion(button.dataset.id, true));
+  });
+
+  refreshIcons();
+}
+
+function renderProvinceResults(province) {
+  const matches = getFilteredRegions();
+  els.listTitle.textContent = `${province}城市`;
+  els.resultCount.textContent = matches.length;
+  els.placeList.classList.remove("province-progress-list");
+
+  if (!matches.length) {
+    const emptyText =
+      listFilter === "visited"
+        ? "这个省份里还没有已点亮的城市"
+        : listFilter === "photos"
+          ? "这个省份里还没有带照片的城市"
+          : "这个省份里暂时没有可显示的城市";
+    els.placeList.innerHTML = `<div class="empty-small">${emptyText}</div>`;
+    refreshIcons();
+    return;
+  }
+
+  els.placeList.innerHTML = matches
     .map((region) => {
       const summary = getRegionSummary(region.id);
       return `
@@ -1655,14 +1934,14 @@ function getAllTravelersSummary() {
 }
 
 function getRegionFillColor(regionId, summary) {
-  if (!summary.any) return "#fff6df";
-  if (!cloud.enabled) return "#f2a23a";
+  if (!summary.any) return "#171b25";
+  if (!cloud.enabled) return "#7a60ff";
   const ownerIds = [...new Set(getScopedFootprints().filter((item) => item.region_id === regionId && item.visited).map((item) => item.owner_id))];
-  if (activeOwnerId !== "all") return getTravelerColor(activeOwnerId);
-  if (ownerIds.length === 1) return getTravelerColor(ownerIds[0]);
-  if (ownerIds.length > 1) return "#d85f47";
+  if (activeOwnerId !== "all") return "#7a60ff";
+  if (ownerIds.length === 1) return "#8b6cff";
+  if (ownerIds.length > 1) return "#af69ff";
   const photoOwner = getScopedPhotos().find((photo) => photo.region_id === regionId)?.owner_id;
-  return photoOwner ? getTravelerColor(photoOwner) : "#52b788";
+  return photoOwner ? "#a57cff" : "#7a60ff";
 }
 
 function getTravelerColor(ownerId) {
@@ -1752,7 +2031,9 @@ function getLabelText(feature) {
   if (state.labelMode === "all") return name;
   if (province === "香港特别行政区") return code === "810000" ? "香港" : "";
   if (province === "澳门特别行政区") return code === "820000" ? "澳门" : "";
-  if (KEY_LABEL_NAMES.has(name)) return name;
+  const zoom = map?.getZoom?.() ?? 4;
+  const hasFocusedContext = Boolean(selectedId || getSearchQuery() || els.provinceFilter.value);
+  if (KEY_LABEL_NAMES.has(name) && (hasFocusedContext || zoom >= 5.2 || OVERVIEW_LABEL_NAMES.has(name))) return name;
   return "";
 }
 

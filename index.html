@@ -11,9 +11,21 @@
       href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&family=Noto+Serif+SC:wght@500;700;800&family=Space+Grotesk:wght@500;700&display=swap"
     />
     <link rel="stylesheet" href="./vendor/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=31" />
+    <link rel="stylesheet" href="./styles.css?v=34" />
   </head>
   <body>
+    <div class="cinema-backdrop" aria-hidden="true">
+      <div class="backdrop-glow glow-warm"></div>
+      <div class="backdrop-glow glow-violet"></div>
+      <div class="backdrop-beam beam-primary"></div>
+      <div class="backdrop-beam beam-secondary"></div>
+      <div class="backdrop-cloud cloud-near"></div>
+      <div class="backdrop-cloud cloud-far"></div>
+      <div class="backdrop-fog fog-high"></div>
+      <div class="backdrop-fog fog-low"></div>
+      <canvas class="mist-canvas" id="mistCanvas"></canvas>
+      <div class="film-grain"></div>
+    </div>
     <div class="app-shell">
       <header class="topbar">
         <div class="brand">
@@ -74,7 +86,9 @@
 
       <main class="workspace">
         <section class="map-stage" aria-label="中国旅游足迹地图">
-          <div id="map"></div>
+          <div class="map-shell">
+            <div id="map"></div>
+          </div>
           <div class="map-overlay">
             <div class="search-box">
               <i data-lucide="search"></i>
@@ -191,6 +205,6 @@
     <script src="./vendor/lucide.min.js"></script>
     <script src="./vendor/supabase.js"></script>
     <script src="./supabase-config.js?v=2"></script>
-    <script src="./app.js?v=31"></script>
+    <script src="./app.js?v=34"></script>
   </body>
 </html>
