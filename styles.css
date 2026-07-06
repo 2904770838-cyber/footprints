@@ -333,9 +333,7 @@ button {
   position: relative;
   height: 100%;
   min-height: 520px;
-  background:
-    radial-gradient(circle at 50% 42%, rgba(25, 219, 255, 0.22), transparent 32%),
-    linear-gradient(135deg, #02111c, #061d2b 54%, #040817);
+  background: linear-gradient(135deg, #020b14, #041422 54%, #020813);
 }
 
 .globe-host .leaflet-pane,
@@ -349,9 +347,7 @@ button {
   inset: 0;
   z-index: 420;
   cursor: grab;
-  background:
-    radial-gradient(circle at 50% 50%, transparent 0 30%, rgba(11, 225, 255, 0.08) 31%, transparent 54%),
-    radial-gradient(circle at 50% 55%, rgba(0, 0, 0, 0), rgba(0, 6, 16, 0.64) 74%);
+  background: transparent;
 }
 
 .globe-canvas:active {

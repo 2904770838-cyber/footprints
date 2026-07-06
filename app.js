@@ -1,6 +1,9 @@
 const DATA_URL = "./data/china-regions.geojson?v=3";
 const EARTH_TEXTURE_URL = "./assets/earth-atmos-2048.jpg?v=1";
 const EARTH_TEXTURE_FALLBACK_URL = "https://raw.githubusercontent.com/mrdoob/three.js/r149/examples/textures/planets/earth_atmos_2048.jpg";
+const EARTH_NORMAL_URL = "./assets/earth-normal-2048.jpg?v=1";
+const EARTH_SPECULAR_URL = "./assets/earth-specular-2048.jpg?v=1";
+const EARTH_CLOUDS_URL = "./assets/earth-clouds-1024.png?v=1";
 const STORE_KEY = "china-travel-footprints-v1";
 const NAME_KEY = "china-travel-footprints-name";
 const MAX_IMAGE_EDGE = 1280;
@@ -269,11 +272,13 @@ function initGlobe(geojson) {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
+  if ("outputColorSpace" in renderer && THREE.SRGBColorSpace) renderer.outputColorSpace = THREE.SRGBColorSpace;
+  if ("outputEncoding" in renderer && THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
   mount.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 1000);
-  camera.position.set(0, 0, 430);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 1200);
+  camera.position.set(0, 0, 470);
 
   const root = new THREE.Group();
   const outlineGroup = new THREE.Group();
@@ -281,22 +286,26 @@ function initGlobe(geojson) {
   root.add(outlineGroup, markerGroup);
   scene.add(root);
 
-  scene.add(new THREE.AmbientLight(0x8fe9ff, 0.92));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
-  keyLight.position.set(-120, 90, 220);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.78));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.55);
+  keyLight.position.set(-150, 110, 260);
   scene.add(keyLight);
-  const rimLight = new THREE.DirectionalLight(0x42f5ff, 1.1);
-  rimLight.position.set(160, -60, -140);
-  scene.add(rimLight);
+  const fillLight = new THREE.DirectionalLight(0xb8d4ff, 0.55);
+  fillLight.position.set(180, -40, 110);
+  scene.add(fillLight);
 
   const textureLoader = new THREE.TextureLoader();
   textureLoader.setCrossOrigin?.("anonymous");
+  const anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy?.() || 1);
   const earthTexture = textureLoader.load(
     EARTH_TEXTURE_URL,
     () => globe?.renderer.render(globe.scene, globe.camera),
     undefined,
     () => {
       textureLoader.load(EARTH_TEXTURE_FALLBACK_URL, (fallbackTexture) => {
+        if (THREE.SRGBColorSpace) fallbackTexture.colorSpace = THREE.SRGBColorSpace;
+        if (THREE.sRGBEncoding) fallbackTexture.encoding = THREE.sRGBEncoding;
+        fallbackTexture.anisotropy = anisotropy;
         earth.material.map = fallbackTexture;
         earth.material.needsUpdate = true;
       });
@@ -304,31 +313,42 @@ function initGlobe(geojson) {
   );
   if (THREE.SRGBColorSpace) earthTexture.colorSpace = THREE.SRGBColorSpace;
   if (THREE.sRGBEncoding) earthTexture.encoding = THREE.sRGBEncoding;
+  earthTexture.anisotropy = anisotropy;
+  const normalTexture = textureLoader.load(EARTH_NORMAL_URL);
+  normalTexture.anisotropy = anisotropy;
+  const specularTexture = textureLoader.load(EARTH_SPECULAR_URL);
+  specularTexture.anisotropy = anisotropy;
+  const cloudTexture = textureLoader.load(EARTH_CLOUDS_URL);
+  if (THREE.SRGBColorSpace) cloudTexture.colorSpace = THREE.SRGBColorSpace;
+  if (THREE.sRGBEncoding) cloudTexture.encoding = THREE.sRGBEncoding;
+  cloudTexture.anisotropy = anisotropy;
 
   const earth = new THREE.Mesh(
     new THREE.SphereGeometry(84, 128, 64),
     new THREE.MeshPhongMaterial({
       map: earthTexture,
       color: 0xffffff,
-      emissive: 0x06111a,
-      shininess: 18,
-      transparent: true,
-      opacity: 1,
+      normalMap: normalTexture,
+      normalScale: new THREE.Vector2(0.75, 0.75),
+      specularMap: specularTexture,
+      specular: new THREE.Color(0x4f6f94),
+      emissive: 0x02060a,
+      emissiveIntensity: 0.22,
+      shininess: 16,
     }),
   );
   root.add(earth);
 
-  const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(87.5, 96, 48),
-    new THREE.MeshBasicMaterial({ color: 0x2df4ff, transparent: true, opacity: 0.13, side: THREE.BackSide }),
+  const clouds = new THREE.Mesh(
+    new THREE.SphereGeometry(85.2, 128, 64),
+    new THREE.MeshPhongMaterial({
+      map: cloudTexture,
+      transparent: true,
+      opacity: 0.18,
+      depthWrite: false,
+    }),
   );
-  root.add(glow);
-
-  const atmosphere = new THREE.Mesh(
-    new THREE.SphereGeometry(99, 96, 48),
-    new THREE.MeshBasicMaterial({ color: 0x17d9ff, transparent: true, opacity: 0.055, side: THREE.BackSide }),
-  );
-  scene.add(atmosphere);
+  root.add(clouds);
 
   const stars = makeStarField();
   scene.add(stars);
@@ -348,6 +368,8 @@ function initGlobe(geojson) {
     regionObjects: new Map(),
     markers: new Map(),
     labels: new Map(),
+    earth,
+    clouds,
     targetQuaternion: new THREE.Quaternion(),
     dragging: false,
     moved: false,
@@ -431,10 +453,9 @@ function bindGlobeEvents() {
   canvas.addEventListener("pointermove", (event) => {
     if (!globe.dragging) return;
     const dx = event.clientX - globe.lastPointer.x;
-    const dy = event.clientY - globe.lastPointer.y;
-    if (Math.abs(dx) + Math.abs(dy) > 3) globe.moved = true;
+    if (Math.abs(dx) > 2) globe.moved = true;
     globe.lastPointer = { x: event.clientX, y: event.clientY };
-    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(dy * 0.006, dx * 0.006, 0, "XYZ"));
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dx * 0.006);
     globe.root.quaternion.premultiply(q);
     globe.targetQuaternion.copy(globe.root.quaternion);
   });
@@ -448,7 +469,7 @@ function bindGlobeEvents() {
 
   canvas.addEventListener("wheel", (event) => {
     event.preventDefault();
-    globe.camera.position.z = Math.max(330, Math.min(560, globe.camera.position.z + Math.sign(event.deltaY) * 18));
+    globe.camera.position.z = Math.max(240, Math.min(760, globe.camera.position.z + Math.sign(event.deltaY) * 22));
   }, { passive: false });
 
   window.addEventListener("resize", fitGlobeToElement);
@@ -459,6 +480,7 @@ function animateGlobe() {
   requestAnimationFrame(animateGlobe);
   globe.frame += 1;
   if (!globe.dragging) globe.root.quaternion.slerp(globe.targetQuaternion, 0.075);
+  if (globe.clouds) globe.clouds.rotation.y += 0.00035;
   if (globe.frame % 2 === 0) updateGlobeLabels();
   globe.renderer.render(globe.scene, globe.camera);
 }
