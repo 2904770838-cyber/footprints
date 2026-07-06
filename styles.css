@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --ink: #20302d;
-  --muted: #66736f;
-  --paper: rgba(255, 252, 244, 0.88);
-  --paper-strong: rgba(255, 252, 244, 0.96);
-  --line: rgba(48, 65, 60, 0.18);
-  --shadow: 0 24px 70px rgba(26, 37, 34, 0.24);
-  --teal: #067f7a;
-  --teal-dark: #075c59;
-  --sun: #f2a23a;
-  --coral: #d85f47;
-  --sand: #f4dec0;
+  --ink: #eafff8;
+  --muted: #9dc6c7;
+  --paper: rgba(8, 22, 30, 0.78);
+  --paper-strong: rgba(11, 28, 38, 0.92);
+  --line: rgba(114, 245, 255, 0.22);
+  --shadow: 0 28px 80px rgba(0, 8, 18, 0.42);
+  --teal: #16d7c6;
+  --teal-dark: #77fff2;
+  --sun: #f2c45f;
+  --coral: #ff6f61;
+  --sand: #d5f7ef;
 }
 
 * {
@@ -29,7 +29,10 @@ body {
     Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   color: var(--ink);
   background:
-    linear-gradient(115deg, rgba(17, 45, 44, 0.86), rgba(17, 45, 44, 0.28) 45%, rgba(196, 106, 54, 0.42)),
+    radial-gradient(circle at 18% 18%, rgba(22, 215, 198, 0.26), transparent 32%),
+    radial-gradient(circle at 88% 10%, rgba(255, 111, 97, 0.18), transparent 28%),
+    radial-gradient(circle at 60% 86%, rgba(242, 196, 95, 0.14), transparent 34%),
+    linear-gradient(135deg, rgba(2, 8, 18, 0.96), rgba(5, 25, 36, 0.92) 48%, rgba(13, 18, 34, 0.96)),
     url("./assets/china-travel-hero.jpg") center / cover fixed;
   overflow: auto;
 }
@@ -327,9 +330,66 @@ button {
 }
 
 #map {
+  position: relative;
   height: 100%;
   min-height: 520px;
-  background: #d7e8dc;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(25, 219, 255, 0.22), transparent 32%),
+    linear-gradient(135deg, #02111c, #061d2b 54%, #040817);
+}
+
+.globe-host .leaflet-pane,
+.globe-host .leaflet-control-container {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.globe-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 420;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 30%, rgba(11, 225, 255, 0.08) 31%, transparent 54%),
+    radial-gradient(circle at 50% 55%, rgba(0, 0, 0, 0), rgba(0, 6, 16, 0.64) 74%);
+}
+
+.globe-canvas:active {
+  cursor: grabbing;
+}
+
+.globe-canvas canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.globe-label-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+}
+
+.globe-city-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  padding: 3px 7px;
+  border: 1px solid rgba(126, 255, 246, 0.42);
+  border-radius: 7px;
+  color: #eafff8;
+  background: rgba(2, 15, 25, 0.66);
+  box-shadow: 0 0 18px rgba(22, 215, 198, 0.22);
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+  transform: translate(-9999px, -9999px);
+}
+
+.globe-city-label.selected {
+  color: #07151b;
+  background: linear-gradient(135deg, #f2c45f, #77fff2);
 }
 
 .map-overlay {
@@ -957,6 +1017,125 @@ button {
 .name-dialog-panel .primary-btn {
   width: 100%;
   margin-top: 14px;
+}
+
+/* Futuristic visual layer */
+.topbar,
+.travelers-section,
+.map-stage,
+.side-panel > section {
+  border-color: rgba(126, 255, 246, 0.24);
+  background:
+    linear-gradient(135deg, rgba(9, 27, 38, 0.84), rgba(7, 18, 30, 0.68)),
+    linear-gradient(90deg, rgba(22, 215, 198, 0.12), rgba(255, 111, 97, 0.08));
+  box-shadow:
+    0 24px 70px rgba(0, 7, 18, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 32px rgba(22, 215, 198, 0.06);
+}
+
+.brand-mark,
+.icon-btn,
+.primary-btn,
+.segmented button.active,
+.label-toggle.active,
+.name-edit-btn {
+  box-shadow: 0 0 24px rgba(22, 215, 198, 0.24);
+}
+
+.brand p,
+.brand h1,
+.top-stats span,
+.province-row-head b,
+.label-toggle,
+.search-box svg {
+  color: var(--teal-dark);
+}
+
+.current-user-chip,
+.search-box,
+.map-overlay select,
+.segmented,
+.label-toggle,
+.top-stats div,
+.province-row,
+.place-row,
+.traveler-card,
+.empty-state,
+.gallery-tile,
+.photo-tile,
+.name-dialog-panel input {
+  border-color: rgba(126, 255, 246, 0.18);
+  color: var(--ink);
+  background: rgba(5, 18, 29, 0.68);
+}
+
+.search-box,
+.map-overlay select,
+.segmented,
+.label-toggle {
+  box-shadow:
+    0 14px 34px rgba(0, 8, 18, 0.34),
+    inset 0 0 18px rgba(22, 215, 198, 0.06);
+}
+
+.search-box input,
+.map-overlay select,
+.fields input,
+.fields textarea,
+.name-dialog-panel input {
+  color: var(--ink);
+}
+
+.search-box input::placeholder,
+.fields textarea::placeholder {
+  color: rgba(157, 198, 199, 0.7);
+}
+
+.place-row:hover,
+.place-row.selected,
+.province-row:hover,
+.traveler-card:hover,
+.traveler-card.active {
+  border-color: rgba(242, 196, 95, 0.54);
+  background: rgba(15, 39, 52, 0.9);
+}
+
+.place-row.selected,
+.traveler-card.active {
+  box-shadow: inset 0 0 0 1px rgba(242, 196, 95, 0.22), 0 0 24px rgba(242, 196, 95, 0.12);
+}
+
+.province-progress {
+  background: rgba(126, 255, 246, 0.12);
+}
+
+.province-progress i {
+  background: linear-gradient(90deg, var(--teal), var(--sun), var(--coral));
+}
+
+.legend,
+.lightbox p,
+.empty-small,
+.place-row small,
+.province-row small,
+.travelers-title p,
+.community-row span,
+.community-row p,
+.top-stats small {
+  color: var(--muted);
+}
+
+.fields input,
+.fields textarea {
+  border-color: rgba(126, 255, 246, 0.16);
+  background: rgba(3, 14, 24, 0.62);
+}
+
+.name-dialog-panel {
+  background:
+    linear-gradient(150deg, rgba(8, 24, 34, 0.96), rgba(4, 12, 24, 0.94)),
+    url("./assets/china-travel-hero.jpg") center / cover;
 }
 
 .lightbox-open {

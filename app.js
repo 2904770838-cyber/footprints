@@ -128,6 +128,7 @@ let selectedId = null;
 let listFilter = "all";
 let activeOwnerId = "local";
 let currentPage = 0;
+let globe = null;
 
 const state = loadState();
 const cloud = {
@@ -174,6 +175,7 @@ async function init() {
 
   populateProvinceFilter();
   drawRegions(geojson);
+  initGlobe(geojson);
   await initCloud();
   renderAll();
   setPage(0);
@@ -252,6 +254,355 @@ function drawRegions(geojson) {
   map.fitBounds(chinaBounds, { padding: [22, 22] });
 }
 
+function initGlobe(geojson) {
+  if (!window.THREE) return;
+
+  const host = document.querySelector("#map");
+  host.classList.add("globe-host");
+  const mount = document.createElement("div");
+  mount.className = "globe-canvas";
+  const labelLayer = document.createElement("div");
+  labelLayer.className = "globe-label-layer";
+  host.append(mount, labelLayer);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.7));
+  mount.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 900);
+  camera.position.set(0, 0, 310);
+
+  const root = new THREE.Group();
+  const outlineGroup = new THREE.Group();
+  const markerGroup = new THREE.Group();
+  root.add(outlineGroup, markerGroup);
+  scene.add(root);
+
+  scene.add(new THREE.AmbientLight(0x8fe9ff, 1.45));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+  keyLight.position.set(-120, 90, 220);
+  scene.add(keyLight);
+
+  const earth = new THREE.Mesh(
+    new THREE.SphereGeometry(100, 96, 48),
+    new THREE.MeshPhongMaterial({
+      color: 0x143a46,
+      emissive: 0x061b24,
+      shininess: 24,
+      transparent: true,
+      opacity: 0.96,
+    }),
+  );
+  root.add(earth);
+
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(103.5, 96, 48),
+    new THREE.MeshBasicMaterial({ color: 0x2df4ff, transparent: true, opacity: 0.1, side: THREE.BackSide }),
+  );
+  root.add(glow);
+
+  const atmosphere = new THREE.Mesh(
+    new THREE.SphereGeometry(118, 96, 48),
+    new THREE.MeshBasicMaterial({ color: 0x17d9ff, transparent: true, opacity: 0.055, side: THREE.BackSide }),
+  );
+  scene.add(atmosphere);
+
+  const stars = makeStarField();
+  scene.add(stars);
+
+  globe = {
+    enabled: true,
+    scene,
+    camera,
+    renderer,
+    mount,
+    labelLayer,
+    root,
+    outlineGroup,
+    markerGroup,
+    raycaster: new THREE.Raycaster(),
+    pointer: new THREE.Vector2(),
+    regionObjects: new Map(),
+    markers: new Map(),
+    labels: new Map(),
+    targetQuaternion: new THREE.Quaternion(),
+    dragging: false,
+    moved: false,
+    lastPointer: { x: 0, y: 0 },
+    frame: 0,
+  };
+
+  for (const feature of geojson.features) {
+    addGlobeRegion(feature);
+  }
+
+  fitGlobeToElement();
+  focusGlobeOnChina(false);
+  bindGlobeEvents();
+  animateGlobe();
+}
+
+function makeStarField() {
+  const vertices = [];
+  for (let i = 0; i < 650; i += 1) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(Math.random() * 2 - 1);
+    const radius = 360 + Math.random() * 260;
+    vertices.push(radius * Math.sin(phi) * Math.cos(theta), radius * Math.cos(phi), radius * Math.sin(phi) * Math.sin(theta));
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  return new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xbffaff, size: 1.25, transparent: true, opacity: 0.62 }));
+}
+
+function addGlobeRegion(feature) {
+  if (!globe) return;
+  const { id, name } = feature.properties;
+  const group = new THREE.Group();
+  group.userData.regionId = id;
+  const rings = getFeatureOuterRings(feature);
+
+  rings.forEach((ring) => {
+    const sampled = sampleRing(ring, 160);
+    if (sampled.length < 2) return;
+    const points = sampled.map(([lon, lat]) => lonLatToVector(lon, lat, 101.2));
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color: 0x70f7ff, transparent: true, opacity: 0.28 });
+    const line = new THREE.Line(geometry, material);
+    line.userData.regionId = id;
+    group.add(line);
+  });
+
+  const center = getFeatureCenter(feature);
+  const marker = new THREE.Mesh(
+    new THREE.SphereGeometry(1.75, 12, 8),
+    new THREE.MeshBasicMaterial({ color: 0x76fff1, transparent: true, opacity: 0.84 }),
+  );
+  marker.position.copy(lonLatToVector(center.lon, center.lat, 103.4));
+  marker.userData.regionId = id;
+  group.add(marker);
+
+  const label = document.createElement("span");
+  label.className = "globe-city-label";
+  label.textContent = name;
+  label.hidden = true;
+  globe.labelLayer.appendChild(label);
+
+  globe.outlineGroup.add(group);
+  globe.regionObjects.set(id, { group, marker, label, center });
+  globe.markers.set(id, marker);
+  globe.labels.set(id, label);
+}
+
+function bindGlobeEvents() {
+  if (!globe) return;
+  const canvas = globe.renderer.domElement;
+
+  canvas.addEventListener("pointerdown", (event) => {
+    globe.dragging = true;
+    globe.moved = false;
+    globe.lastPointer = { x: event.clientX, y: event.clientY };
+    canvas.setPointerCapture?.(event.pointerId);
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    if (!globe.dragging) return;
+    const dx = event.clientX - globe.lastPointer.x;
+    const dy = event.clientY - globe.lastPointer.y;
+    if (Math.abs(dx) + Math.abs(dy) > 3) globe.moved = true;
+    globe.lastPointer = { x: event.clientX, y: event.clientY };
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(dy * 0.006, dx * 0.006, 0, "XYZ"));
+    globe.root.quaternion.premultiply(q);
+    globe.targetQuaternion.copy(globe.root.quaternion);
+  });
+
+  canvas.addEventListener("pointerup", (event) => {
+    canvas.releasePointerCapture?.(event.pointerId);
+    const wasDrag = globe.moved;
+    globe.dragging = false;
+    if (!wasDrag) selectGlobeRegionAt(event);
+  });
+
+  canvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    globe.camera.position.z = Math.max(210, Math.min(380, globe.camera.position.z + Math.sign(event.deltaY) * 16));
+  }, { passive: false });
+
+  window.addEventListener("resize", fitGlobeToElement);
+}
+
+function animateGlobe() {
+  if (!globe) return;
+  requestAnimationFrame(animateGlobe);
+  globe.frame += 1;
+  if (!globe.dragging) globe.root.quaternion.slerp(globe.targetQuaternion, 0.075);
+  if (globe.frame % 2 === 0) updateGlobeLabels();
+  globe.renderer.render(globe.scene, globe.camera);
+}
+
+function fitGlobeToElement() {
+  if (!globe) return;
+  const rect = globe.mount.getBoundingClientRect();
+  const width = Math.max(1, rect.width);
+  const height = Math.max(1, rect.height);
+  globe.camera.aspect = width / height;
+  globe.camera.updateProjectionMatrix();
+  globe.renderer.setSize(width, height, false);
+}
+
+function selectGlobeRegionAt(event) {
+  if (!globe) return;
+  const rect = globe.renderer.domElement.getBoundingClientRect();
+  globe.pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  globe.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  globe.raycaster.setFromCamera(globe.pointer, globe.camera);
+  const hits = globe.raycaster.intersectObjects([...globe.markers.values()], false);
+  if (hits[0]?.object?.userData?.regionId) selectRegion(hits[0].object.userData.regionId, true);
+}
+
+function getFeatureOuterRings(feature) {
+  const geometry = feature.geometry;
+  if (!geometry) return [];
+  if (geometry.type === "Polygon") return geometry.coordinates.map((polygon) => polygon);
+  if (geometry.type === "MultiPolygon") return geometry.coordinates.map((polygon) => polygon[0]).filter(Boolean);
+  return [];
+}
+
+function sampleRing(ring, maxPoints) {
+  if (ring.length <= maxPoints) return ring;
+  const step = Math.ceil(ring.length / maxPoints);
+  const sampled = ring.filter((_, index) => index % step === 0);
+  const first = sampled[0];
+  const last = sampled[sampled.length - 1];
+  if (first && last && (first[0] !== last[0] || first[1] !== last[1])) sampled.push(first);
+  return sampled;
+}
+
+function getFeatureCenter(feature) {
+  let minLon = 180;
+  let maxLon = -180;
+  let minLat = 90;
+  let maxLat = -90;
+  getFeatureOuterRings(feature).forEach((ring) => {
+    ring.forEach(([lon, lat]) => {
+      minLon = Math.min(minLon, lon);
+      maxLon = Math.max(maxLon, lon);
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+    });
+  });
+  return {
+    lon: Number.isFinite(minLon) ? (minLon + maxLon) / 2 : 104.2,
+    lat: Number.isFinite(minLat) ? (minLat + maxLat) / 2 : 35.4,
+  };
+}
+
+function lonLatToVector(lon, lat, radius) {
+  const phi = THREE.MathUtils.degToRad(90 - lat);
+  const theta = THREE.MathUtils.degToRad(lon + 180);
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta),
+  );
+}
+
+function focusGlobeOnRegion(id) {
+  if (!globe) return;
+  const item = globe.regionObjects.get(id);
+  if (item) focusGlobeOnLonLat(item.center.lon, item.center.lat);
+}
+
+function focusGlobeOnProvince(province) {
+  if (!globe) return;
+  const centers = regions
+    .filter((region) => region.province === province)
+    .map((region) => globe.regionObjects.get(region.id)?.center)
+    .filter(Boolean);
+  if (!centers.length) return;
+  const center = centers.reduce((acc, item) => ({ lon: acc.lon + item.lon, lat: acc.lat + item.lat }), { lon: 0, lat: 0 });
+  focusGlobeOnLonLat(center.lon / centers.length, center.lat / centers.length);
+}
+
+function focusGlobeOnChina(animate = true) {
+  focusGlobeOnLonLat(104.2, 35.4, animate);
+}
+
+function focusGlobeOnLonLat(lon, lat, animate = true) {
+  if (!globe) return;
+  const from = lonLatToVector(lon, lat, 1).normalize();
+  const to = new THREE.Vector3(0, 0, 1);
+  const q = new THREE.Quaternion().setFromUnitVectors(from, to);
+  globe.targetQuaternion.copy(q);
+  if (!animate) globe.root.quaternion.copy(q);
+}
+
+function refreshGlobeStyles() {
+  if (!globe) return;
+  const query = getSearchQuery();
+  const searchActive = Boolean(query);
+
+  globe.regionObjects.forEach((item, id) => {
+    const region = getRegion(id);
+    const summary = getRegionSummary(id);
+    const isSelected = selectedId === id;
+    const isSearchMatch = !searchActive || regionMatchesSearch(region, query);
+    const fillColor = getRegionFillColor(id, summary);
+    const color = new THREE.Color(isSelected || (searchActive && isSearchMatch) ? "#8ffff7" : summary.any ? fillColor : "#376f78");
+    const opacity = searchActive && !isSearchMatch ? 0.08 : isSelected ? 0.95 : summary.any ? 0.62 : 0.28;
+
+    item.group.children.forEach((child) => {
+      if (child.material?.color) child.material.color.copy(color);
+      if (child.material) child.material.opacity = opacity;
+    });
+    item.marker.material.color.set(isSelected ? "#ffffff" : summary.any ? fillColor : "#4ddfeb");
+    item.marker.material.opacity = searchActive && !isSearchMatch ? 0.12 : isSelected ? 1 : summary.any ? 0.9 : 0.42;
+    item.marker.scale.setScalar(isSelected ? 2.1 : searchActive && isSearchMatch ? 1.55 : summary.any ? 1.25 : 0.9);
+  });
+}
+
+function updateGlobeLabels() {
+  if (!globe) return;
+  const width = globe.mount.clientWidth;
+  const height = globe.mount.clientHeight;
+  const isCompact = width < 560;
+  const labelBudget = state.labelMode === "all" ? (isCompact ? 46 : 96) : (isCompact ? 26 : 56);
+  let shown = 0;
+  const cameraDir = new THREE.Vector3();
+  globe.camera.getWorldDirection(cameraDir);
+
+  globe.regionObjects.forEach((item, id) => {
+    const region = getRegion(id);
+    const isSelected = selectedId === id;
+    const shouldShow =
+      isSelected ||
+      (state.labelMode === "all" && (getSearchQuery() ? regionMatchesSearch(region) : true)) ||
+      (state.labelMode === "key" && KEY_LABEL_NAMES.has(region?.name));
+    if (!shouldShow || state.labelMode === "none") {
+      item.label.hidden = true;
+      return;
+    }
+
+    const world = item.marker.getWorldPosition(new THREE.Vector3());
+    const visible = world.clone().normalize().dot(cameraDir.clone().negate()) > 0.16;
+    if (!visible) {
+      item.label.hidden = true;
+      return;
+    }
+    if (!isSelected && shown >= labelBudget) {
+      item.label.hidden = true;
+      return;
+    }
+
+    const projected = world.project(globe.camera);
+    shown += 1;
+    item.label.hidden = false;
+    item.label.classList.toggle("selected", isSelected);
+    item.label.style.transform = `translate(${(projected.x * 0.5 + 0.5) * width}px, ${(-projected.y * 0.5 + 0.5) * height}px)`;
+  });
+}
+
 function styleForFeature(feature) {
   const id = feature.properties.id;
   const region = getRegion(id);
@@ -303,6 +654,7 @@ function bindGlobalEvents() {
 
   els.fitChinaBtn.addEventListener("click", () => {
     if (chinaBounds) map.fitBounds(chinaBounds, { padding: [22, 22] });
+    focusGlobeOnChina();
   });
 
   els.toggleLabelsBtn.addEventListener("click", cycleLabelMode);
@@ -756,6 +1108,7 @@ function focusProvince(province) {
     const merged = bounds.reduce((acc, item) => acc.extend(item), bounds[0]);
     map.fitBounds(merged, { padding: [55, 55], maxZoom: 7 });
   }
+  focusGlobeOnProvince(province);
   renderAll();
 }
 
@@ -769,6 +1122,7 @@ function selectRegion(id, zoomTo) {
       }
     });
   }
+  if (zoomTo) focusGlobeOnRegion(id);
   renderAll();
 }
 
@@ -922,6 +1276,7 @@ function refreshMapStyles() {
     layer.setStyle(styleForFeature(layer.feature));
     if (layer.feature.properties.id === selectedId) layer.bringToFront();
   });
+  refreshGlobeStyles();
 }
 
 function refreshPhotoMarkers() {
@@ -1304,6 +1659,7 @@ function applyLabelVisibility() {
   els.mapLabelToggleBtn.classList.toggle("active", mode !== "none");
   els.mapLabelToggleBtn.setAttribute("aria-label", `城市标注：${modeText}`);
   els.mapLabelToggleBtn.innerHTML = `<i data-lucide="${icon}"></i>${modeText}`;
+  updateGlobeLabels();
   refreshIcons();
 }
 
