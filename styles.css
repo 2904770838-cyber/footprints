@@ -831,7 +831,10 @@ textarea:focus-visible {
 .map-overlay select {
   padding: 0 44px 0 18px;
   appearance: none;
+  color-scheme: dark;
   color: var(--text-strong);
+  font-size: 14px;
+  line-height: 1.4;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background:
     linear-gradient(45deg, transparent 50%, rgba(240, 241, 246, 0.88) 50%),
@@ -846,6 +849,11 @@ textarea:focus-visible {
     6px 6px,
     auto;
   background-repeat: no-repeat;
+}
+
+.map-overlay select option {
+  color: var(--text-strong);
+  background: #10151d;
 }
 
 .segmented {

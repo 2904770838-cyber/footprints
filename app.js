@@ -653,7 +653,7 @@ function styleForFeature(feature) {
   const isSelected = selectedId === id;
   const query = getSearchQuery();
   const searchActive = Boolean(query);
-  const isSearchMatch = !searchActive || regionMatchesSearch(region, query);
+  const isSearchMatch = !searchActive || isRegionInActiveSearchResults(id);
   const fillColor = getRegionFillColor(id, summary);
 
   return {
@@ -671,10 +671,16 @@ function bindGlobalEvents() {
   els.searchInput.addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     if (!getSearchQuery()) return;
-    const firstMatch = getFilteredRegions()[0];
+    const firstMatch = getActiveSearchResults()[0];
     if (firstMatch) selectRegion(firstMatch.id, true);
   });
   els.provinceFilter.addEventListener("change", () => {
+    if (getSearchQuery()) {
+      selectedId = null;
+      renderAll();
+      fitSearchResultsToMap();
+      return;
+    }
     if (els.provinceFilter.value) {
       focusProvince(els.provinceFilter.value);
       return;
@@ -977,7 +983,7 @@ function renderList() {
 }
 
 function renderSearchResults() {
-  const matches = getFilteredRegions();
+  const matches = getActiveSearchResults();
   els.listTitle.textContent = "搜索结果";
   els.resultCount.textContent = matches.length;
   els.placeList.classList.remove("province-progress-list");
@@ -1029,7 +1035,7 @@ function fitSearchResultsToMap() {
     return;
   }
 
-  const matches = getFilteredRegions();
+  const matches = getActiveSearchResults();
   if (!matches.length) return;
   if (matches.length === 1) {
     selectRegion(matches[0].id, true);
@@ -1091,9 +1097,22 @@ function regionMatchesSearch(region, query = getSearchQuery()) {
   return haystack.includes(query);
 }
 
-function getFilteredRegions() {
+function isRegionInActiveSearchResults(id) {
+  return getActiveSearchResults().some((region) => region.id === id);
+}
+
+function getActiveSearchResults() {
   const query = getSearchQuery();
-  const province = els.provinceFilter.value;
+  if (!query) return [];
+
+  const scopedMatches = getFilteredRegions();
+  if (scopedMatches.length || !els.provinceFilter.value) return scopedMatches;
+  return getFilteredRegions({ ignoreProvince: true });
+}
+
+function getFilteredRegions({ ignoreProvince = false } = {}) {
+  const query = getSearchQuery();
+  const province = ignoreProvince ? "" : els.provinceFilter.value;
 
   return regions
     .filter((region) => {
