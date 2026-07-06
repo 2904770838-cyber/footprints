@@ -85,6 +85,7 @@ const els = {
   photoCount: document.querySelector("#photoCount"),
   progressPercent: document.querySelector("#progressPercent"),
   resultCount: document.querySelector("#resultCount"),
+  listTitle: document.querySelector("#listTitle"),
   galleryCount: document.querySelector("#galleryCount"),
   searchInput: document.querySelector("#searchInput"),
   provinceFilter: document.querySelector("#provinceFilter"),
@@ -253,22 +254,32 @@ function drawRegions(geojson) {
 
 function styleForFeature(feature) {
   const id = feature.properties.id;
+  const region = getRegion(id);
   const summary = getRegionSummary(id);
   const isSelected = selectedId === id;
+  const query = getSearchQuery();
+  const searchActive = Boolean(query);
+  const isSearchMatch = !searchActive || regionMatchesSearch(region, query);
   const fillColor = getRegionFillColor(id, summary);
 
   return {
-    color: isSelected ? "#063f3d" : summary.any ? shadeColor(fillColor, -24) : "rgba(23, 76, 72, 0.62)",
-    weight: isSelected ? 2.8 : summary.mine ? 1.35 : summary.any ? 1.1 : 0.72,
-    opacity: isSelected ? 1 : 0.9,
+    color: isSelected || (searchActive && isSearchMatch) ? "#063f3d" : summary.any ? shadeColor(fillColor, -24) : "rgba(23, 76, 72, 0.62)",
+    weight: isSelected ? 2.8 : searchActive && isSearchMatch ? 2.1 : summary.mine ? 1.35 : summary.any ? 1.1 : 0.72,
+    opacity: searchActive && !isSearchMatch ? 0.24 : isSelected ? 1 : 0.9,
     fillColor: summary.any ? fillColor : "#fff6df",
-    fillOpacity: isSelected ? 0.78 : summary.photos ? 0.68 : summary.mine ? 0.58 : summary.any ? 0.44 : 0.2,
+    fillOpacity: searchActive && !isSearchMatch ? 0.06 : isSelected || (searchActive && isSearchMatch) ? 0.78 : summary.photos ? 0.68 : summary.mine ? 0.58 : summary.any ? 0.44 : 0.2,
     dashArray: summary.any ? "" : "3 4",
   };
 }
 
 function bindGlobalEvents() {
-  els.searchInput.addEventListener("input", () => renderList());
+  els.searchInput.addEventListener("input", handleSearchInput);
+  els.searchInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    if (!getSearchQuery()) return;
+    const firstMatch = getFilteredRegions()[0];
+    if (firstMatch) selectRegion(firstMatch.id, true);
+  });
   els.provinceFilter.addEventListener("change", () => {
     if (els.provinceFilter.value) {
       focusProvince(els.provinceFilter.value);
@@ -285,6 +296,8 @@ function bindGlobalEvents() {
       document.querySelectorAll(".segmented button").forEach((item) => item.classList.remove("active"));
       button.classList.add("active");
       renderList();
+      refreshMapStyles();
+      fitSearchResultsToMap();
     });
   });
 
@@ -530,7 +543,14 @@ function renderSelectedPlace() {
 }
 
 function renderList() {
+  const query = getSearchQuery();
+  if (query) {
+    renderSearchResults();
+    return;
+  }
+
   const provinces = getProvinceProgress();
+  els.listTitle.textContent = "省份进度";
   els.resultCount.textContent = provinces.length;
 
   if (!provinces.length) {
@@ -562,6 +582,76 @@ function renderList() {
   refreshIcons();
 }
 
+function renderSearchResults() {
+  const matches = getFilteredRegions();
+  els.listTitle.textContent = "搜索结果";
+  els.resultCount.textContent = matches.length;
+  els.placeList.classList.remove("province-progress-list");
+
+  if (!matches.length) {
+    els.placeList.innerHTML = `<div class="empty-small">没有找到匹配的城市、地区或省份</div>`;
+    refreshIcons();
+    return;
+  }
+
+  els.placeList.innerHTML = matches
+    .slice(0, 80)
+    .map((region) => {
+      const summary = getRegionSummary(region.id);
+      return `
+        <button class="place-row ${selectedId === region.id ? "selected" : ""}" data-id="${escapeHtml(region.id)}">
+          <span>
+            <strong>${escapeHtml(region.name)}</strong>
+            <small>${escapeHtml(region.province)} · ${escapeHtml(region.kind)}</small>
+          </span>
+          <span class="row-badges">
+            ${summary.mine ? `<b class="mine">我</b>` : ""}
+            ${summary.any ? `<b>已点亮</b>` : ""}
+            ${summary.photos ? `<b>${summary.photos} 图</b>` : ""}
+          </span>
+        </button>`;
+    })
+    .join("");
+
+  els.placeList.querySelectorAll(".place-row").forEach((button) => {
+    button.addEventListener("click", () => selectRegion(button.dataset.id, true));
+  });
+
+  refreshIcons();
+}
+
+function handleSearchInput() {
+  selectedId = null;
+  renderSelectedPlace();
+  renderList();
+  refreshMapStyles();
+  fitSearchResultsToMap();
+}
+
+function fitSearchResultsToMap() {
+  const query = getSearchQuery();
+  if (!query || !regionLayer) {
+    if (chinaBounds && !els.provinceFilter.value) map.fitBounds(chinaBounds, { padding: [22, 22] });
+    return;
+  }
+
+  const matches = getFilteredRegions();
+  if (!matches.length) return;
+  if (matches.length === 1) {
+    selectRegion(matches[0].id, true);
+    return;
+  }
+
+  const matchIds = new Set(matches.map((region) => region.id));
+  const bounds = [];
+  regionLayer.eachLayer((layer) => {
+    if (matchIds.has(layer.feature.properties.id)) bounds.push(layer.getBounds());
+  });
+  if (!bounds.length) return;
+  const merged = bounds.reduce((acc, item) => acc.extend(item), bounds[0]);
+  map.fitBounds(merged, { padding: [48, 48], maxZoom: 7 });
+}
+
 function renderGallery() {
   const photos = [];
   for (const region of regions) {
@@ -590,8 +680,25 @@ function renderGallery() {
   });
 }
 
+function getSearchQuery() {
+  return normalizeSearchText(els.searchInput.value);
+}
+
+function normalizeSearchText(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
+function regionMatchesSearch(region, query = getSearchQuery()) {
+  if (!query || !region) return !query;
+  const haystack = normalizeSearchText(`${region.name} ${region.province} ${region.kind} ${region.code || ""}`);
+  return haystack.includes(query);
+}
+
 function getFilteredRegions() {
-  const query = els.searchInput.value.trim().toLowerCase();
+  const query = getSearchQuery();
   const province = els.provinceFilter.value;
 
   return regions
@@ -601,7 +708,7 @@ function getFilteredRegions() {
       if (listFilter === "visited" && !summary.any) return false;
       if (listFilter === "photos" && !summary.photos) return false;
       if (!query) return true;
-      return `${region.name} ${region.province} ${region.kind}`.toLowerCase().includes(query);
+      return regionMatchesSearch(region, query);
     })
     .sort((a, b) => {
       const aSummary = getRegionSummary(a.id);

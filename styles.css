@@ -797,6 +797,25 @@ button {
   display: flex;
   align-items: center;
   gap: 5px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.row-badges b {
+  min-height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 7px;
+  border-radius: 7px;
+  color: #fff8e8;
+  background: rgba(6, 127, 122, 0.78);
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.row-badges b.mine {
+  background: var(--coral);
 }
 
 .mini-badge {
